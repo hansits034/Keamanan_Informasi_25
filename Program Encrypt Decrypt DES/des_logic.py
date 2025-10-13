@@ -3,7 +3,7 @@ from des_tables import *
 class DES:
     def _permute(self, block, table):
         """Melakukan permutasi pada blok berdasarkan tabel."""
-        return [block[x] for x in table]
+        return [block[x-1] for x in table]
 
     def _string_to_bits(self, text):
         """Mengubah string menjadi array bit."""
@@ -75,4 +75,5 @@ class DES:
 
         final_block = right + left 
         
+
         return self._permute(final_block, FINAL_PERMUTATION)
