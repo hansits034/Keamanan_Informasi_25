@@ -31,14 +31,14 @@ Kunci utama 64-bit diproses untuk menghasilkan 16 subkunci 48-bit yang berbeda u
 
 ### 3. Proses Enkripsi per Blok (`des_logic.py`)
 Setiap blok plaintext 64-bit melewati proses berikut:
-1.  [cite_start]**Permutasi Awal (IP)**: Urutan bit dalam blok diacak menggunakan tabel `INITIAL_PERMUTATION` berdasarkan Materi KI03.
+1.  [cite_start]**Permutasi Awal (IP)**: Urutan bit dalam blok diacak menggunakan tabel INITIAL_PERMUTATION berdasarkan Materi KI03.
 2.  **16 Ronde Feistel**: Blok melewati 16 ronde pemrosesan. Dalam setiap ronde, blok dibagi dua (Kiri/L dan Kanan/R). Bagian kanan diproses oleh (Fungsi F) bersama subkunci, hasilnya di-XOR dengan bagian kiri, lalu posisi kanan dan kiri ditukar.
 3.  **Fungsi F (F-Function)**:
     - [cite_start]**Ekspansi (E)**: Bagian kanan (32 bit) diperluas menjadi 48 bit berdasarkan Materi KI03.
     - **XOR**: Hasilnya di-XOR dengan subkunci ronde.
     - [cite_start]**Substitusi S-Box**: Hasil 48-bit dipecah dan dimasukkan ke dalam 8 S-Box berdasarkan Materi KI03, mengubah 48-bit menjadi 32-bit. Ini adalah langkah kunci yang membuat DES aman.
-    - [cite_start]**Permutasi (P)**: Hasil 32-bit diacak lagi menggunakan `P_BOX` berdasarkan Materi KI03.
-4.  [cite_start]**Permutasi Final (FP)**: Setelah 16 ronde, hasilnya digabungkan kembali dan diacak untuk terakhir kali menggunakan `FINAL_PERMUTATION` berdasarkan Materi KI03.
+    - [cite_start]**Permutasi (P)**: Hasil 32-bit diacak lagi menggunakan P_BOX berdasarkan Materi KI03.
+4.  [cite_start]**Permutasi Final (FP)**: Setelah 16 ronde, hasilnya digabungkan kembali dan diacak untuk terakhir kali menggunakan FINAL_PERMUTATION berdasarkan Materi KI03.
 
 ### Proses Dekripsi
 Proses dekripsi identik dengan enkripsi. Perbedaannya hanya urutan penggunaan subkunci yang dibalik.
