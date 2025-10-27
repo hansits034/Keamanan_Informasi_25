@@ -1,8 +1,8 @@
-# Komunikasi Terenkripsi DES (Python) Server dan CLient
+# Komunikasi Terenkripsi DES (Python) Server dan Client
 
 Ini adalah program komunikasi pesan sederhana yang mengimplementasikan enkripsi **DES (Data Encryption Standard)** murni menggunakan Python. Proyek ini mendemonstrasikan komunikasi Client-Server yang aman di mana semua pesan dienkripsi sebelum dikirim melalui jaringan.
 
-Proyek ini menggunakan **TCP Sockets** (`socket.SOCK_STREAM`) untuk komunikasi yang andal dan berurutan, serta **threading** untuk memungkinkan pengiriman dan penerimaan pesan secara bersamaan.
+Proyek ini menggunakan TCP Sockets (`socket.SOCK_STREAM`) untuk komunikasi yang andal dan berurutan, serta threading untuk memungkinkan pengiriman dan penerimaan pesan secara bersamaan.
 
 ## Struktur File
 
