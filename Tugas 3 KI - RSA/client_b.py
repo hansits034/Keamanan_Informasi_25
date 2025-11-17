@@ -6,16 +6,17 @@ import string
 from rsa_manual import RSAManual, serialize, deserialize
 from des_implementation import DESImplementation
 
-# Server
-PKA_IP = '127.0.0.1' # Kalau di pake program progjar harus diganti ini dulu 172.16.17.101
+# IP Server PKA (Authority)
+PKA_IP = '172.16.16.101' 
 PKA_PORT = 12345
 
+# Identitas Diri
 MY_ID = "ID-B"
-TARGET_ID = "ID-A"
-
-# Client A
 MY_LISTEN_PORT = 9003
-PEER_A_IP = '127.0.0.1' # # Kalau di pake program progjar harus diganti ini dulu 172.16.16.102
+
+# Identitas & IP Target (Client A)
+TARGET_ID = "ID-A"
+PEER_A_IP = '172.16.16.102' 
 PEER_A_PORT = 9002
 
 rsa = RSAManual()
@@ -49,7 +50,6 @@ def listen_for_peer():
             print(f"\n[B] Menerima P1_STEP_3 dari A. Decrypted: {decrypted}")
             
             parts = decrypted.split("||")
-            sender_id = parts[0]
             n1 = parts[1]
             
             # Step 4: B request Key A to PKA
@@ -80,7 +80,7 @@ def listen_for_peer():
              print(f"\n[B] Menerima P2_STEP_3 dari A (N2 Verified).")
              
              # Step 4: B -> A (Enc PubA [N1, SecretKey])
-             send_p2_step_4()
+             send_p2_step_4() 
              
         conn.close()
 
@@ -93,9 +93,6 @@ def request_key_a(n1_from_a):
     print(f"[B] Protocol 1 Step 4: Request Key A sent ke PKA.")
     
     # Step 5: PKA -> B
-    # Karena socket PKA masih listen di main thread,
-    # Disini recv blocking dari socket PKA yang sudah established.
-    # Tapi karena sturktur code, kita recv disini:
     resp = deserialize(pka_socket.recv(4096))
     
     if resp['type'] == "KEY_RESPONSE":
@@ -148,7 +145,10 @@ def send_p2_step_4():
 
 def start_des_chat():
     des = DESImplementation()
-    print("\n--- DES CHAT READY (Client 1 -> Server -> Client 2) ---")
+    print("\n" + "="*60)
+    print(f"      DES SECURE CHAT READY ({MY_ID})")
+    print(f"      Secret Key Session: {des_secret_key}")
+    print("="*60)
     
     def receive_chat():
         while True:
@@ -159,18 +159,34 @@ def start_des_chat():
                 if pkg.get('type') == 'DES_INCOMING':
                     sender = pkg['sender']
                     cipher_hex = pkg['content']
+                    
                     plaintext = des.decrypt(cipher_hex, des_secret_key)
-                    print(f"\n[PESAN MASUK dari {sender}]: {plaintext}")
+                    
+                    print(f"\n[DES LOG: PESAN DITERIMA]")
+                    print(f"  + Pengirim    : {sender}")
+                    print(f"  + Ciphertext  : {cipher_hex}")
+                    print(f"  + Kunci (Key) : {des_secret_key}")
+                    print(f"  + Plaintext   : {plaintext}")
+                    print("------------------------------------------------")
                     print("[REPLY] > ", end="", flush=True)
             except: break
 
     threading.Thread(target=receive_chat, daemon=True).start()
     
     while True:
-        msg = input("[B] Kirim Pesan: ")
-        if msg == 'exit': break
+        msg = input(f"[{MY_ID}] Ketik Pesan: ")
+        if msg.lower() == 'exit': break
         
         enc_hex = des.encrypt(msg, des_secret_key)
+        
+        print(f"\n[DES LOG: MENGIRIM PESAN]")
+        print(f"  + Pengirim    : {MY_ID} (Saya)")
+        print(f"  + Tujuan      : {TARGET_ID}")
+        print(f"  + Plaintext   : {msg}")
+        print(f"  + Kunci (Key) : {des_secret_key}")
+        print(f"  + Ciphertext  : {enc_hex}")
+        print("------------------------------------------------")
+        
         packet = {
             "type": "DES_MESSAGE",
             "target": TARGET_ID,
@@ -183,14 +199,11 @@ def main():
     
     threading.Thread(target=listen_for_peer, daemon=True).start()
     
-    # Konek PKA
     pka_socket.connect((PKA_IP, PKA_PORT))
     
-    # Registrasi
     reg_packet = {"id": MY_ID, "pub_key": my_pub}
     pka_socket.sendall(serialize(reg_packet))
     
-    # Terima PKA Pub
     resp = deserialize(pka_socket.recv(4096))
     pka_pub_key = tuple(resp['pka_pub'])
     print(f"[B] Terhubung PKA. Menunggu request dari A...")
