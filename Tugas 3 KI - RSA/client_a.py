@@ -5,26 +5,26 @@ import random
 from rsa_manual import RSAManual, serialize, deserialize
 from des_implementation import DESImplementation
 
-# Konfigurasi Network
-PKA_IP = '127.0.0.1' # Ganti 172.16.16.101 jika beda mesin
+# Server
+PKA_IP = '127.0.0.1' # Kalau di pake program progjar harus diganti ini dulu 172.16.16.101
 PKA_PORT = 12345
 
 MY_ID = "ID-A"
 TARGET_ID = "ID-B"
 
-# Listener Port untuk P2P dengan B
+# Client B
 MY_LISTEN_PORT = 9002 
-PEER_B_IP = '127.0.0.1' # Ganti 172.16.16.103 jika beda mesin
+PEER_B_IP = '127.0.0.1' # Kalau di pake program progjar harus diganti ini dulu 172.16.16.103
 PEER_B_PORT = 9003
 
-# Setup RSA
+# RSA
 rsa = RSAManual()
 my_pub, my_priv = rsa.generate_keypair()
-pka_pub_key = None # Akan didapat dari handshake
-peer_pub_key = None # Akan didapat dari PKA
-des_secret_key = None # Akan didapat dari B
+pka_pub_key = None 
+peer_pub_key = None 
+des_secret_key = None 
 
-# Setup Socket ke PKA (Persistent)
+# Socket PKA (Persistent)
 pka_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 def listen_for_peer():
@@ -51,11 +51,10 @@ def listen_for_peer():
             recv_n1 = parts[0]
             recv_n2 = parts[1]
             
-            # Verifikasi N1 (Simplifikasi: kita anggap valid)
+            # Verifikasi N1
             print(f"[A] Verifikasi N1: OK. N2 diterima: {recv_n2}")
             
             # Protocol 1 Step 7: A -> B (Encrypted PubB [N2])
-            # Karena koneksi P2P B->A sudah tutup, kita buka koneksi ke B
             send_p1_step_7(recv_n2)
 
         # Protocol 2 Step 2: B -> A (Encrypted PubA [N1 || N2])
@@ -183,7 +182,7 @@ def main():
     
     input("Tekan Enter untuk memulai Protocol 1 (Minta Kunci B)...")
     
-    # === PROTOCOL 1 START ===
+    # Start Protocol 1
     # Step 1: A -> PKA (Request || Time1)
     t1 = str(int(time.time()))
     req = {"type": "REQUEST_KEY", "target": TARGET_ID, "time": t1}
@@ -194,22 +193,18 @@ def main():
     resp = deserialize(pka_socket.recv(4096))
     if resp['type'] == "KEY_RESPONSE":
         signed_data = resp['data']
-        # Decrypt signature using PKA Public Key
         decrypted_payload = rsa.decrypt_string(signed_data, pka_pub_key)
         print(f"[A] Protocol 1 Step 2: Balasan PKA (Verified): {decrypted_payload}")
         
         # Parse: PublicKeyB || Request || Time1
         parts = decrypted_payload.split("||")
-        # Reconstruct tuple key from string rep
-        key_str = parts[0] # String "(e, n)"
-        peer_pub_key = eval(key_str) # Warning: eval unsafe in prod, ok for sim
-        
+        key_str = parts[0]
+        peer_pub_key = eval(key_str)
         print(f"[A] Public Key B didapat: {peer_pub_key}")
         
         # Step 3: A -> B (Encrypted PubB [ID-A || N1])
         n1 = str(random.randint(1000, 9999))
         payload = f"{MY_ID}||{n1}"
-        
         print(f"[A] Protocol 1 Step 3: Mengirim Nonce {n1} ke B...")
         encrypted_payload = rsa.encrypt_string(payload, peer_pub_key)
         
@@ -222,7 +217,7 @@ def main():
         except ConnectionRefusedError:
             print("[ERROR] B belum online. Jalankan client_b.py dulu.")
 
-    # Wait for Listener threads (Protocol continuation happens in listen_for_peer)
+    # Wait for Listener
     while True:
         time.sleep(1)
 
