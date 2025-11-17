@@ -6,15 +6,16 @@ import string
 from rsa_manual import RSAManual, serialize, deserialize
 from des_implementation import DESImplementation
 
-# Konfigurasi Network
-PKA_IP = '127.0.0.1' 
+# Server
+PKA_IP = '127.0.0.1' # Kalau di pake program progjar harus diganti ini dulu 172.16.17.101
 PKA_PORT = 12345
 
 MY_ID = "ID-B"
 TARGET_ID = "ID-A"
 
+# Client A
 MY_LISTEN_PORT = 9003
-PEER_A_IP = '127.0.0.1' # 172.16.16.102
+PEER_A_IP = '127.0.0.1' # # Kalau di pake program progjar harus diganti ini dulu 172.16.16.102
 PEER_A_PORT = 9002
 
 rsa = RSAManual()
@@ -79,7 +80,7 @@ def listen_for_peer():
              print(f"\n[B] Menerima P2_STEP_3 dari A (N2 Verified).")
              
              # Step 4: B -> A (Enc PubA [N1, SecretKey])
-             send_p2_step_4() # N1 disini simplifikasi pakai dummy atau disimpan state
+             send_p2_step_4()
              
         conn.close()
 
@@ -92,9 +93,9 @@ def request_key_a(n1_from_a):
     print(f"[B] Protocol 1 Step 4: Request Key A sent ke PKA.")
     
     # Step 5: PKA -> B
-    # Note: Karena socket PKA sedang listen di main thread (atau harusnya begitu),
-    # Disini kita recv blocking dari socket PKA yang sudah established.
-    # Namun karena structure code, kita recv disini:
+    # Karena socket PKA masih listen di main thread,
+    # Disini recv blocking dari socket PKA yang sudah established.
+    # Tapi karena sturktur code, kita recv disini:
     resp = deserialize(pka_socket.recv(4096))
     
     if resp['type'] == "KEY_RESPONSE":
@@ -134,7 +135,6 @@ def send_p2_step_4():
     des_secret_key = generate_secret_key()
     
     # Step 4: B -> A (Enc PubA [N1, SecretKey])
-    # Asumsi N1 valid, kirim Secret Key
     payload = f"VALID||{des_secret_key}"
     ciphertext = rsa.encrypt_string(payload, peer_pub_key)
     
