@@ -42,8 +42,6 @@ class RSAManual:
         return True
 
     def generate_keypair(self):
-        # Menggunakan bilangan prima kecil agar simulasi cepat
-        # Dalam produksi, gunakan p dan q yang sangat besar
         primes = [i for i in range(100, 300) if self.is_prime(i)]
         p = random.choice(primes)
         q = random.choice(primes)
@@ -53,14 +51,12 @@ class RSAManual:
         n = p * q
         phi = (p-1) * (q-1)
         
-        # Pilih e
         e = random.randrange(1, phi)
         g = self.gcd(e, phi)
         while g != 1:
             e = random.randrange(1, phi)
             g = self.gcd(e, phi)
             
-        # Hitung d
         d = self.multiplicative_inverse(e, phi)
         
         # Public Key: (e, n), Private Key: (d, n)
@@ -77,8 +73,6 @@ class RSAManual:
         return pow(cipher_int, exp, n)
 
     def encrypt_string(self, message, key):
-        # Ubah string ke int, lalu enkripsi
-        # Format output: list of integers (simulasi blok)
         encrypted_blocks = []
         for char in message:
             m = ord(char)
@@ -93,7 +87,6 @@ class RSAManual:
             decrypted_chars.append(chr(m))
         return "".join(decrypted_chars)
 
-# Helper untuk mengubah list/tuple ke string agar bisa dikirim via socket
 import json
 
 def serialize(data):
