@@ -23,16 +23,13 @@ rsa = RSAManual()
 print("\n" + "="*60)
 print(f" GENERATING RSA KEYS FOR {MY_ID}...")
 my_pub, my_priv = rsa.generate_keypair()
-# [TRANSPARANSI RSA]
 print(f" [RSA INFO] Public Key (e, n)  : {my_pub}")
 print(f" [RSA INFO] Private Key (d, n) : {my_priv}")
-print(f" [RSA MATH] e={my_pub[0]}, d={my_priv[0]}, n={my_pub[1]}")
 print("="*60 + "\n")
 
 pka_pub_key = None
 peer_pub_key = None
 des_secret_key = None
-
 pka_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 def generate_secret_key():
@@ -50,7 +47,6 @@ def listen_for_peer():
         if not data: continue
         pkg = deserialize(data)
         
-        # Protocol 1 Step 3
         if pkg['type'] == "P1_STEP_3":
             encrypted = pkg['data']
             decrypted = rsa.decrypt_string(encrypted, my_priv)
@@ -59,14 +55,12 @@ def listen_for_peer():
             n1 = parts[1]
             request_key_a(n1)
             
-        # Protocol 1 Step 7
         elif pkg['type'] == "P1_STEP_7":
             encrypted = pkg['data']
             decrypted = rsa.decrypt_string(encrypted, my_priv)
             print(f"\n[B] Menerima P1_STEP_7 (N2) dari A. Verified: {decrypted}")
             print("[B] PROTOCOL 1 SELESAI. Key Exchange aman.")
             
-        # Protocol 2 Step 1
         elif pkg['type'] == "P2_STEP_1":
              encrypted = pkg['data']
              decrypted = rsa.decrypt_string(encrypted, my_priv)
@@ -75,7 +69,6 @@ def listen_for_peer():
              n1 = parts[0]
              send_p2_step_2(n1)
 
-        # Protocol 2 Step 3
         elif pkg['type'] == "P2_STEP_3":
              encrypted = pkg['data']
              decrypted = rsa.decrypt_string(encrypted, my_priv)
@@ -86,13 +79,11 @@ def listen_for_peer():
 
 def request_key_a(n1_from_a):
     global peer_pub_key
-    # Step 4
     t2 = str(int(time.time()))
     req = {"type": "REQUEST_KEY", "target": TARGET_ID, "time": t2}
     pka_socket.sendall(serialize(req))
     print(f"[B] Protocol 1 Step 4: Request Key A sent ke PKA.")
     
-    # Step 5
     resp = deserialize(pka_socket.recv(4096))
     if resp['type'] == "KEY_RESPONSE":
         signed_data = resp['data']
@@ -103,7 +94,6 @@ def request_key_a(n1_from_a):
         peer_pub_key = eval(key_str)
         print(f"[B] Public Key A didapat: {peer_pub_key}")
         
-        # Step 6
         n2 = str(random.randint(1000, 9999))
         payload = f"{n1_from_a}||{n2}"
         ciphertext = rsa.encrypt_string(payload, peer_pub_key)
@@ -127,7 +117,6 @@ def send_p2_step_4():
     global des_secret_key
     des_secret_key = generate_secret_key()
     
-    # Step 4
     payload = f"VALID||{des_secret_key}"
     ciphertext = rsa.encrypt_string(payload, peer_pub_key)
     
@@ -155,8 +144,6 @@ def start_des_chat():
                 if pkg.get('type') == 'DES_INCOMING':
                     sender = pkg['sender']
                     cipher_hex = pkg['content']
-                    
-                    # Decrypt DES
                     plaintext = des.decrypt(cipher_hex, des_secret_key)
                     
                     print(f"\n[PESAN DITERIMA DARI {sender}]")
@@ -167,24 +154,32 @@ def start_des_chat():
                     signature_blocks = pkg.get('signature')
                     if signature_blocks:
                         print(f"  ------------------------------------------------")
-                        print(f"  [RSA-VERIFY] Memverifikasi Signature {sender}...")
-                        print(f"  [RSA-VERIFY] Public Key Pengirim: {peer_pub_key}")
-                        print(f"  [RSA-VERIFY] Signature Block (Raw): {signature_blocks[:5]}... (truncated)")
+                        print(f"  [DIAGRAM STEP 3 & 4] VERIFYING SIGNATURE (Process Y -> X)")
+                        print(f"  Using Sender's Public Key (PU_b): {peer_pub_key}")
+                        print(f"  Formula: X = Y^e mod n")
                         
-                        try:
-                            # Decrypt Signature menggunakan Public Key LAWAN
-                            # Diagram Kanan: Decryption Algorithm (PUa) -> Message
-                            verified_msg = rsa.decrypt_string(signature_blocks, peer_pub_key)
-                            print(f"  + Hasil Decrypt Signature: '{verified_msg}'")
+                        decrypted_chars = []
+                        valid = True
+                        
+                        print(f"  [MATH PROCESS] Detail perhitungan per blok:")
+                        for i, cipher_val in enumerate(signature_blocks):
+                            # Rumus RSA Verify
+                            val_m = pow(cipher_val, peer_pub_key[0], peer_pub_key[1])
+                            char_m = chr(val_m)
+                            decrypted_chars.append(char_m)
                             
-                            if verified_msg == plaintext:
-                                print(f"  + STATUS: [VALID] ✅ Pesan otentik dari {sender}.")
-                            else:
-                                print(f"  + STATUS: [INVALID] ❌ Isi pesan berbeda dengan tanda tangan!")
-                        except Exception as e:
-                            print(f"  + STATUS: [ERROR] Gagal verifikasi: {e}")
+                            if i < 3: 
+                                print(f"    - Block {i}: {cipher_val} ^ {peer_pub_key[0]} mod {peer_pub_key[1]} = {val_m} ('{char_m}')")
+                        
+                        verified_msg = "".join(decrypted_chars)
+                        print(f"  + Hasil Gabungan (X): '{verified_msg}'")
+
+                        if verified_msg == plaintext:
+                            print(f"  + STATUS: [VALID] Signature cocok dengan pesan asli.")
+                        else:
+                            print(f"  + STATUS: [INVALID] Signature palsu/rusak!")
                     else:
-                        print(f"  + STATUS: [WARNING] Pesan ini tidak memiliki tanda tangan digital.")
+                        print(f"  + STATUS: [WARNING] Tidak ada signature.")
                     
                     print("------------------------------------------------")
                     print("[REPLY] > ", end="", flush=True)
@@ -198,41 +193,45 @@ def start_des_chat():
         if msg.lower() == 'exit': break
         
         # [TRANSPARANSI SIGNING]
-        # Diagram Kiri: Message Source -> Encryption (PRa) -> Y
-        print(f"\n[RSA-SIGN] Signing message dengan Private Key {MY_ID}...")
-        print(f"[RSA-SIGN] Private Key: {my_priv}")
+        print(f"\n[DIAGRAM STEP 1 & 2] CREATING SIGNATURE (Process X -> Y)")
+        print(f"Using My Private Key (PR_a): {my_priv}")
+        print(f"Formula: Y = X^d mod n")
         
-        signature_blocks = rsa.encrypt_string(msg, my_priv)
-        print(f"[RSA-SIGN] Signature generated (First 5 blocks): {signature_blocks[:5]}...")
+        signature_blocks = []
+        print(f"[MATH PROCESS] Detail perhitungan per karakter:")
+        
+        for i, char in enumerate(msg):
+            # Rumus RSA Sign
+            m_val = ord(char)
+            c_val = pow(m_val, my_priv[0], my_priv[1])
+            signature_blocks.append(c_val)
+            
+            if i < 3:
+                print(f"  - Char '{char}' (Int {m_val}) -> {m_val}^{my_priv[0]} mod {my_priv[1]} = {c_val} (Block Y)")
+        
+        print(f"[RESULT] Signature Blocks (Y): {signature_blocks[:5]}...")
         
         # Encrypt DES
         enc_hex = des.encrypt(msg, des_secret_key)
-        print(f"[DES] Ciphertext generated: {enc_hex}")
         
         packet = {
             "type": "DES_MESSAGE",
             "target": TARGET_ID,
             "content": enc_hex,
-            "signature": signature_blocks # Data Signature ditambahkan
+            "signature": signature_blocks
         }
         pka_socket.sendall(serialize(packet))
 
 def main():
     global pka_pub_key
-    
     threading.Thread(target=listen_for_peer, daemon=True).start()
-    
     pka_socket.connect((PKA_IP, PKA_PORT))
-    
     reg_packet = {"id": MY_ID, "pub_key": my_pub}
     pka_socket.sendall(serialize(reg_packet))
-    
     resp = deserialize(pka_socket.recv(4096))
     pka_pub_key = tuple(resp['pka_pub'])
     print(f"[B] Terhubung PKA. Menunggu request dari A...")
-    
-    while True:
-        time.sleep(1)
+    while True: time.sleep(1)
 
 if __name__ == "__main__":
     main()
