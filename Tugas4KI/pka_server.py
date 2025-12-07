@@ -4,31 +4,25 @@ import time
 from rsa_manual import RSAManual, serialize, deserialize
 
 # Konfigurasi
-HOST = '0.0.0.0' # Bind ke semua interface, IP mesin1/server ini 172.16.16.101
+HOST = '0.0.0.0' 
 PORT = 12345
 
-# Database Key Publik (Simulasi database PKA)
-# A dan B generate key pas runtime, key diterima saat registrasi awal 
-# Untuk simulasi, kita anggap mereka mengirim key saat "connect" pertama kali untuk disimpan
 public_key_db = {} 
-
-# PKA Keys
 pka_rsa = RSAManual()
 pka_pub, pka_priv = pka_rsa.generate_keypair()
 
 print(f"[PKA SERVER] Started at {HOST}:{PORT}")
-print(f"[PKA INFO] Public Key: {pka_pub}")
+print(f"[PKA INFO] Public Key (e, n): {pka_pub}")
+print(f"[PKA INFO] Private Key (d, n): {pka_priv}")
 print("="*50)
 
-# List koneksi untuk Chat Relay
 clients = {}
 
 def handle_client(conn, addr):
     print(f"[CONN] {addr} connected.")
+    client_id = None # Inisialisasi variabel agar aman di finally block
     
     try:
-        # Registrasi Awal
-        # Client mengirim ID dan Public Key mereka
         raw_data = conn.recv(4096)
         if not raw_data: return
         reg_data = deserialize(raw_data)
@@ -36,13 +30,11 @@ def handle_client(conn, addr):
         client_pub_key = reg_data['pub_key']
         
         public_key_db[client_id] = tuple(client_pub_key) 
-        clients[client_id] = conn # Simpan koneksi untuk relay chat
+        clients[client_id] = conn 
         print(f"[REGISTRY] Registered User: {client_id} with Key: {client_pub_key}")
         
-        # Kirim Public Key PKA ke client agar mereka bisa verifikasi tanda tangan PKA
         conn.sendall(serialize({"status": "OK", "pka_pub": pka_pub}))
 
-        # Loop
         while True:
             data = conn.recv(4096)
             if not data: break
@@ -50,9 +42,7 @@ def handle_client(conn, addr):
             request = deserialize(data)
             req_type = request.get('type')
             
-            # Protocol 1, distribusi public key
             if req_type == 'REQUEST_KEY':
-                # Step 1 (A) or 4 (B): menerima request dari client
                 target_id = request['target']
                 timestamp = request['time']
                 
@@ -61,10 +51,7 @@ def handle_client(conn, addr):
                 target_pub_key = public_key_db.get(target_id)
                 
                 if target_pub_key:
-                    # Step 2 or 5: PKA menjawab dengan pesan terenkripsi (PR auth, [PublicKeyTarget || Request || Time])
                     payload_str = f"{target_pub_key}||{req_type}||{timestamp}"
-                    
-                    # Encrypt menggunakan Private Key PKA (Signing)
                     signature = pka_rsa.encrypt_string(payload_str, pka_priv)
                     
                     response = {
@@ -76,17 +63,19 @@ def handle_client(conn, addr):
                 else:
                     print(f"[PKA] Error: Target {target_id} tidak ditemukan.")
 
-            # DES Relay untuk chatting
             elif req_type == 'DES_MESSAGE':
                 target_id = request['target']
                 ciphertext_hex = request['content']
+                # [PERBAIKAN DISINI] Ambil signature dari paket pengirim
+                signature_data = request.get('signature') 
                 
                 if target_id in clients:
                     print(f"[RELAY] Meneruskan pesan DES dari {client_id} ke {target_id}")
                     relay_pkg = {
                         "type": "DES_INCOMING",
                         "sender": client_id,
-                        "content": ciphertext_hex
+                        "content": ciphertext_hex,
+                        "signature": signature_data # [PERBAIKAN] Teruskan signature ke penerima
                     }
                     clients[target_id].sendall(serialize(relay_pkg))
                 else:
@@ -95,7 +84,7 @@ def handle_client(conn, addr):
     except Exception as e:
         print(f"[ERROR] {addr}: {e}")
     finally:
-        if 'client_id' in locals() and client_id in clients:
+        if client_id and client_id in clients:
             del clients[client_id]
         conn.close()
 
